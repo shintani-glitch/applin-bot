@@ -7,53 +7,28 @@ from dotenv import load_dotenv
 import unicodedata
 
 # --- 1. 初期設定と認証 ---
-# .envファイルから環境変数を読み込む
+# (変更なし)
 load_dotenv()
-
-# Google認証
-print("STEP 1: Googleサービスアカウントで認証中...")
-try:
-    gc = gspread.service_account(filename='google_credentials.json')
-    spreadsheet = gc.open(os.getenv('SPREADSHEET_NAME'))
-    worksheet = spreadsheet.sheet1
-    print("  ✅ Google認証成功")
-except Exception as e:
-    print(f"  ❌ Google認証またはスプレッドシートのオープンに失敗しました: {e}")
-    exit()
-
-# Gemini認証
-print("STEP 2: Gemini APIで認証中...")
-try:
-    genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    print("  ✅ Gemini認証成功")
-except Exception as e:
-    print(f"  ❌ Gemini認証に失敗しました: {e}")
-    exit()
-
-# X (Twitter)認証
-print("STEP 3: X (Twitter) APIで認証中...")
-try:
-    client = tweepy.Client(
-        consumer_key=os.getenv('TWITTER_API_KEY'),
-        consumer_secret=os.getenv('TWITTER_API_SECRET'),
-        access_token=os.getenv('TWITTER_ACCESS_TOKEN'),
-        access_token_secret=os.getenv('TWITTER_ACCESS_SECRET')
-    )
-    print("  ✅ X (Twitter)認証成功")
-except Exception as e:
-    print(f"  ❌ X (Twitter)認証に失敗しました: {e}")
-    exit()
-
+gc = gspread.service_account(filename='google_credentials.json')
+spreadsheet = gc.open(os.getenv('SPREADSHEET_NAME'))
+worksheet = spreadsheet.sheet1
+genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
+model = genai.GenerativeModel('gemini-1.5-flash')
+client = tweepy.Client(
+    consumer_key=os.getenv('TWITTER_API_KEY'),
+    consumer_secret=os.getenv('TWITTER_API_SECRET'),
+    access_token=os.getenv('TWITTER_ACCESS_TOKEN'),
+    access_token_secret=os.getenv('TWITTER_ACCESS_SECRET')
+)
 
 # --- 2. 補助関数 ---
 def get_prompt(app_info):
-    """Geminiに投げるプロンプトを組み立てる関数 ★★★役割分担・最終版★★★"""
+    """Geminiに投げるプロンプトを組み立てる関数 ★★★シングルツイート版★★★"""
     return f"""
 # 指令書: Xアカウント「ゲームの妖精アプりん」の自律型コンテンツ生成
 
 あなたは、Xで絶大な人気を誇る、誠実で信頼性の高いゲーム紹介の専門家AI「ゲームの妖精アプりん」です。
-以下の情報を基に、Xに投稿するためのスレッドコンテンツを【あなたの調査・分析能力を最大限に活用して】生成してください。
+以下の情報を基に、Xに投稿するための【1つの完結したツイート】用の文章を生成してください。
 
 ## 1. 基本情報
 - アプリ名: {app_info.get('アプリ名', '')}
@@ -74,22 +49,11 @@ def get_prompt(app_info):
 - 口調は「〜だよ！」「〜なんだ！」のように、親しみやすいタメ口
 
 #### 【出力要件】
-1.  【1通目の投稿（メイン紹介文の"原稿"）】
-    - タスクAの調査結果から導き出した、このゲームの最も魅力的な「紹介ポイント」を3つに絞り、それを基に紹介文を作成してください。
-    - ★★★【最重要制約】★★★
-    - **生成するのは【紹介文の原稿】のみです。**
-    - **文章は、必ず日本語で【120文字】以内に厳密に収めてください。これは絶対のルールです。**
-    - **アフィリエイトリンク、ハッシュタグ、@メンション、スレッド誘導文は一切含めないでください。純粋な文章のブロックだけを生成してください。**
-
-2.  【2通目の投稿（深掘り情報の"原稿"）】
-    - タスクAの調査結果に基づき、プレイヤーにとって最も有益で具体的な「深掘りテーマ」を1つ設定し、そのテーマに沿って役立つ情報を140字以内で作成してください。
-    - こちらにも、リンクやハッシュタグ、メンションは一切含めないでください。
-
-## 3. 出力形式 (この形式を厳守)
-【1通目】
-(生成された文章の原稿)
-【2通目】
-(生成された文章の原稿)
+- タスクAの調査結果を基に、このゲームの【魅力的な紹介文】と【役立つワンポイント情報（序盤攻略のコツなど）】を自然に組み合わせ、1つの魅力的な投稿文を作成してください。
+- ★★★【最重要制約】★★★
+- **生成するのは【紹介文の原稿】のみです。**
+- **文章は、必ず日本語で【180文字】以内に厳密に収めてください。これは絶対のルールです。**
+- **アフィリエイトリンク、ハッシュタグ、@メンションは一切含めないでください。純粋な文章のブロックだけを生成してください。**
 """
 
 # --- 3. メイン処理 ---
@@ -121,35 +85,33 @@ def main():
     prompt = get_prompt(app_info)
     try:
         response = model.generate_content(prompt)
-        parts = response.text.split("【2通目】")
-        first_tweet_body = parts[0].replace("【1通目】", "").strip()
-        second_tweet_body = parts[1].strip() if len(parts) > 1 else ""
+        tweet_body = response.text.strip() # ★★★変更点：1つの文章として受け取る★★★
 
-        if not first_tweet_body or not second_tweet_body:
-             raise Exception("期待した形式でコンテンツが生成されませんでした。")
+        if not tweet_body:
+             raise Exception("Geminiが空のコンテンツを生成しました。")
         print("  ✅ コンテンツ原稿の生成成功")
 
         # プログラムによる文字数チェックと強制カット
-        MAX_CHARS = 120
-        if len(first_tweet_body) > MAX_CHARS:
+        MAX_CHARS = 180
+        if len(tweet_body) > MAX_CHARS:
             print(f"  ⚠️ Geminiが文字数制限({MAX_CHARS}字)を超過！プログラムで強制的にカットします。")
-            first_tweet_body = first_tweet_body[:MAX_CHARS]
+            tweet_body = tweet_body[:MAX_CHARS] + "…"
         
         # プログラムによる最終的なツイートの組み立て
         hashtags = f"#PR {app_info.get('公式ハッシュタグ', '')} #ゲーム紹介 #スマホゲーム #おすすめゲーム"
-        first_tweet_text = f"{first_tweet_body}\n\nこのゲームの攻略ヒントはリプ欄へ！👇\n\n{app_info.get('アフィリエイトリンク', '')}\n{hashtags}"
-        second_tweet_text = second_tweet_body
+        # ★★★変更点：スレッド誘導文を削除し、ダウンロード誘導文に変更★★★
+        final_tweet_text = f"{tweet_body}\n\n▼ダウンロードはこちら\n{app_info.get('アフィリエイトリンク', '')}\n{hashtags}"
 
-        print(f"  - 組み立て後の1通目（文字数: {len(first_tweet_text)}）: {first_tweet_text[:70]}...")
+        print(f"  - 組み立て後のツイート: {final_tweet_text[:70]}...")
 
     except Exception as e:
         print(f"  ❌ Geminiでのコンテンツ生成または組み立てに失敗しました: {e}")
         return
 
-    print("STEP 6: Xにスレッドを投稿中...")
+    print("STEP 6: Xにシングルツイートを投稿中...")
     try:
-        first_tweet = client.create_tweet(text=first_tweet_text)
-        client.create_tweet(text=second_tweet_text, in_reply_to_tweet_id=first_tweet.data['id'])
+        # ★★★変更点：投稿処理を1回だけにする★★★
+        client.create_tweet(text=final_tweet_text)
         print("  ✅ 投稿が完了しました！")
     except Exception as e:
         print(f"  ❌ Xへの投稿に失敗しました: {e}")

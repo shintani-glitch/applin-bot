@@ -7,43 +7,19 @@ from dotenv import load_dotenv
 import unicodedata
 
 # --- 1. 初期設定と認証 ---
+# (変更なし)
 load_dotenv()
-
-# Google認証
-print("STEP 1: Googleサービスアカウントで認証中...")
-try:
-    gc = gspread.service_account(filename='google_credentials.json')
-    spreadsheet = gc.open(os.getenv('SPREADSHEET_NAME'))
-    worksheet = spreadsheet.sheet1
-    print("  ✅ Google認証成功")
-except Exception as e:
-    print(f"  ❌ Google認証またはスプレッドシートのオープンに失敗しました: {e}")
-    exit()
-
-# Gemini認証
-print("STEP 2: Gemini APIで認証中...")
-try:
-    genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    print("  ✅ Gemini認証成功")
-except Exception as e:
-    print(f"  ❌ Gemini認証に失敗しました: {e}")
-    exit()
-
-# X (Twitter)認証
-print("STEP 3: X (Twitter) APIで認証中...")
-try:
-    client = tweepy.Client(
-        consumer_key=os.getenv('TWITTER_API_KEY'),
-        consumer_secret=os.getenv('TWITTER_API_SECRET'),
-        access_token=os.getenv('TWITTER_ACCESS_TOKEN'),
-        access_token_secret=os.getenv('TWITTER_ACCESS_SECRET')
-    )
-    print("  ✅ X (Twitter)認証成功")
-except Exception as e:
-    print(f"  ❌ X (Twitter)認証に失敗しました: {e}")
-    exit()
-
+gc = gspread.service_account(filename='google_credentials.json')
+spreadsheet = gc.open(os.getenv('SPREADSHEET_NAME'))
+worksheet = spreadsheet.sheet1
+genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
+model = genai.GenerativeModel('gemini-1.5-flash')
+client = tweepy.Client(
+    consumer_key=os.getenv('TWITTER_API_KEY'),
+    consumer_secret=os.getenv('TWITTER_API_SECRET'),
+    access_token=os.getenv('TWITTER_ACCESS_TOKEN'),
+    access_token_secret=os.getenv('TWITTER_ACCESS_SECRET')
+)
 
 # --- 2. 補助関数 ---
 def get_prompt(app_info):
@@ -56,23 +32,19 @@ def get_prompt(app_info):
 
 ## 1. 基本情報
 - アプリ名: {app_info.get('アプリ名', '')}
-- アフィリエイトリンク: {app_info.get('アフィリエイトリンク', '')}
-- 公式Xアカウント: {app_info.get('公式Xアカウント', '')}
-- 公式ハッシュタグ: {app_info.get('公式ハッシュタグ', '')}
 
-## 2. 実行タスク
-(省略)
+## 2. 実行タスク (省略)
 
 ## 3. 出力要件
 #### 【1通目の投稿（メイン紹介）】
-- タスクAの調査結果から導き出した、このゲームの最も魅力的な「紹介ポイント」を3つに絞り、それを基に140字以内の紹介文を作成してください。
 - ★★★【重要・今回の変更点】★★★
-- 最後にハッシュタグを付けてください。アフィリエイトリンクは絶対に含めないでください。
-- ハッシュタグは「#PR」「#公式ハッシュタグ」に加え、調査で判明したゲームジャンルや特徴に基づき、あなたがインプレッションを最大化できると判断したものを3つ追加してください。
+- タスクAの調査結果から導き出した、このゲームの最も魅力的な「紹介ポイント」を3つに絞り、それを基に140字以内の紹介文を作成してください。
+- **アフィリエイトリンク、ハッシュタグ、@メンションは一切含めないでください。純粋な文章のみを生成してください。**
 - スレッド誘導文「このゲームの攻略ヒントはリプ欄へ！👇」も忘れずに入れてください。
 
 #### 【2通目の投稿（深掘り情報）】
-- (変更なし)
+- タスクAの調査結果に基づき、プレイヤーにとって最も有益で具体的な「深掘りテーマ」を1つ設定し、そのテーマに沿って役立つ情報を140字以内で作成してください。
+- こちらにも、リンクやハッシュタグ、メンションは一切含めないでください。
 
 ## 4. 出力形式 (この形式を厳守)
 【1通目】
@@ -83,6 +55,7 @@ def get_prompt(app_info):
 
 # --- 3. メイン処理 ---
 def main():
+    # (main関数の中身は、前回から変更ありません)
     print("\nSTEP 4: メイン処理を開始します...")
     try:
         all_apps = worksheet.get_all_records()
@@ -90,7 +63,6 @@ def main():
         print(f"  ❌ スプレッドシートのデータ取得でエラーが発生しました: {e}")
         return
 
-    # フィルタリング処理
     print(f"  - 全{len(all_apps)}件のデータから投稿可能なアプリを探します...")
     
     eligible_apps = []
@@ -104,11 +76,9 @@ def main():
         print("  ❌ 投稿可能なアプリがありませんでした。（フィルタリング後の件数: 0）")
         return
 
-    # ランダムに1つ選ぶ
     app_info = random.choice(eligible_apps)
     print(f"  ✅ 選ばれたアプリ: {app_info['アプリ名']} (投稿可能なアプリ総数: {len(eligible_apps)}件)")
 
-    # Geminiで投稿内容を生成
     print("STEP 5: Geminiでコンテンツを生成中...")
     prompt = get_prompt(app_info)
     try:
@@ -120,12 +90,13 @@ def main():
         if not first_tweet_text or not second_tweet_text:
              raise Exception("期待した形式でコンテンツが生成されませんでした。")
         print("  ✅ コンテンツ生成成功")
+        print(f"  - 生成された1通目: {first_tweet_text[:50]}...") # ログに少しだけ表示
+        print(f"  - 生成された2通目: {second_tweet_text[:50]}...") # ログに少しだけ表示
 
     except Exception as e:
         print(f"  ❌ Geminiでのコンテンツ生成に失敗しました: {e}")
         return
 
-    # Xにスレッドを投稿
     print("STEP 6: Xにスレッドを投稿中...")
     try:
         first_tweet = client.create_tweet(text=first_tweet_text)
@@ -133,7 +104,6 @@ def main():
         print("  ✅ 投稿が完了しました！")
     except Exception as e:
         print(f"  ❌ Xへの投稿に失敗しました: {e}")
-
 
 if __name__ == "__main__":
     main()

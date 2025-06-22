@@ -48,7 +48,7 @@ except Exception as e:
 
 # --- 2. 補助関数 ---
 def get_prompt(app_info):
-    """Geminiに投げるプロンプトを組み立てる関数 ★★★文字数厳守版★★★"""
+    """Geminiに投げるプロンプトを組み立てる関数 ★★★役割分担・最終版★★★"""
     return f"""
 # 指令書: Xアカウント「ゲームの妖精アプりん」の自律型コンテンツ生成
 
@@ -57,9 +57,6 @@ def get_prompt(app_info):
 
 ## 1. 基本情報
 - アプリ名: {app_info.get('アプリ名', '')}
-- アフィリエイトリンク: {app_info.get('アフィリエイトリンク', '')}
-- 公式Xアカウント: {app_info.get('公式Xアカウント', '')}
-- 公式ハッシュタグ: {app_info.get('公式ハッシュタグ', '')}
 
 ## 2. 実行タスク
 ### タスクA: Web調査と分析の実行
@@ -77,21 +74,22 @@ def get_prompt(app_info):
 - 口調は「〜だよ！」「〜なんだ！」のように、親しみやすいタメ口
 
 #### 【出力要件】
-1.  【1通目の投稿（メイン紹介）】
+1.  【1通目の投稿（メイン紹介文の"原稿"）】
     - タスクAの調査結果から導き出した、このゲームの最も魅力的な「紹介ポイント」を3つに絞り、それを基に紹介文を作成してください。
     - ★★★【最重要制約】★★★
-    - **生成する文章（URLやハッシュタグを除く、紹介文の本体）は、必ず日本語で【120文字】以内に厳密に収めてください。これは絶対のルールです。**
-    - 最後にアフィリエイトリンクとハッシュタグを付けます。ハッシュタグは「#PR」「#公式ハッシュタグ」に加え、調査で判明したゲームジャンルや特徴に基づき、あなたがインプレッションを最大化できると判断したものを3つ追加してください。
-    - スレッド誘導文「このゲームの攻略ヒントはリプ欄へ！👇」も忘れずに入れてください。
-2.  【2通目の投稿（深掘り情報）】
-    - タスクAの調査結果（特にストア評価や攻略サイトの情報）に基づき、プレイヤーにとって最も有益で具体的な「深掘りテーマ」を1つ設定してください。（例：「序盤を効率的に進めるコツ」「多くのプレイヤーが推薦する最強キャラ」「無課金でも楽しめる理由」など）
-    - そのテーマに沿って、ブックマークしたくなるような役立つ情報を140字以内で作成してください。
+    - **生成するのは【紹介文の原稿】のみです。**
+    - **文章は、必ず日本語で【120文字】以内に厳密に収めてください。これは絶対のルールです。**
+    - **アフィリエイトリンク、ハッシュタグ、@メンション、スレッド誘導文は一切含めないでください。純粋な文章のブロックだけを生成してください。**
+
+2.  【2通目の投稿（深掘り情報の"原稿"）】
+    - タスクAの調査結果に基づき、プレイヤーにとって最も有益で具体的な「深掘りテーマ」を1つ設定し、そのテーマに沿って役立つ情報を140字以内で作成してください。
+    - こちらにも、リンクやハッシュタグ、メンションは一切含めないでください。
 
 ## 3. 出力形式 (この形式を厳守)
 【1通目】
-(生成された文章)
+(生成された文章の原稿)
 【2通目】
-(生成された文章)
+(生成された文章の原稿)
 """
 
 # --- 3. メイン処理 ---
@@ -123,19 +121,29 @@ def main():
     prompt = get_prompt(app_info)
     try:
         response = model.generate_content(prompt)
-        print("\n---【Geminiからの生の応答ここから】---")
-        print(response.text)
-        print("---【Geminiからの生の応答ここまで】---\n")
-        
         parts = response.text.split("【2通目】")
-        first_tweet_text = parts[0].replace("【1通目】", "").strip()
-        second_tweet_text = parts[1].strip() if len(parts) > 1 else ""
+        first_tweet_body = parts[0].replace("【1通目】", "").strip()
+        second_tweet_body = parts[1].strip() if len(parts) > 1 else ""
 
-        if not first_tweet_text or not second_tweet_text:
+        if not first_tweet_body or not second_tweet_body:
              raise Exception("期待した形式でコンテンツが生成されませんでした。")
-        print("  ✅ コンテンツ生成成功")
+        print("  ✅ コンテンツ原稿の生成成功")
+
+        # プログラムによる文字数チェックと強制カット
+        MAX_CHARS = 120
+        if len(first_tweet_body) > MAX_CHARS:
+            print(f"  ⚠️ Geminiが文字数制限({MAX_CHARS}字)を超過！プログラムで強制的にカットします。")
+            first_tweet_body = first_tweet_body[:MAX_CHARS]
+        
+        # プログラムによる最終的なツイートの組み立て
+        hashtags = f"#PR {app_info.get('公式ハッシュタグ', '')} #ゲーム紹介 #スマホゲーム #おすすめゲーム"
+        first_tweet_text = f"{first_tweet_body}\n\nこのゲームの攻略ヒントはリプ欄へ！👇\n\n{app_info.get('アフィリエイトリンク', '')}\n{hashtags}"
+        second_tweet_text = second_tweet_body
+
+        print(f"  - 組み立て後の1通目（文字数: {len(first_tweet_text)}）: {first_tweet_text[:70]}...")
+
     except Exception as e:
-        print(f"  ❌ Geminiでのコンテンツ生成に失敗しました: {e}")
+        print(f"  ❌ Geminiでのコンテンツ生成または組み立てに失敗しました: {e}")
         return
 
     print("STEP 6: Xにスレッドを投稿中...")
@@ -145,6 +153,7 @@ def main():
         print("  ✅ 投稿が完了しました！")
     except Exception as e:
         print(f"  ❌ Xへの投稿に失敗しました: {e}")
+
 
 if __name__ == "__main__":
     main()

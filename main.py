@@ -7,23 +7,48 @@ from dotenv import load_dotenv
 import unicodedata
 
 # --- 1. 初期設定と認証 ---
+# .envファイルから環境変数を読み込む
 load_dotenv()
-# (認証部分は変更なし、そのまま)
-gc = gspread.service_account(filename='google_credentials.json')
-spreadsheet = gc.open(os.getenv('SPREADSHEET_NAME'))
-worksheet = spreadsheet.sheet1
-genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
-model = genai.GenerativeModel('gemini-1.5-flash')
-client = tweepy.Client(
-    consumer_key=os.getenv('TWITTER_API_KEY'),
-    consumer_secret=os.getenv('TWITTER_API_SECRET'),
-    access_token=os.getenv('TWITTER_ACCESS_TOKEN'),
-    access_token_secret=os.getenv('TWITTER_ACCESS_SECRET')
-)
+
+# Google認証
+print("STEP 1: Googleサービスアカウントで認証中...")
+try:
+    gc = gspread.service_account(filename='google_credentials.json')
+    spreadsheet = gc.open(os.getenv('SPREADSHEET_NAME'))
+    worksheet = spreadsheet.sheet1
+    print("  ✅ Google認証成功")
+except Exception as e:
+    print(f"  ❌ Google認証またはスプレッドシートのオープンに失敗しました: {e}")
+    exit()
+
+# Gemini認証
+print("STEP 2: Gemini APIで認証中...")
+try:
+    genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    print("  ✅ Gemini認証成功")
+except Exception as e:
+    print(f"  ❌ Gemini認証に失敗しました: {e}")
+    exit()
+
+# X (Twitter)認証
+print("STEP 3: X (Twitter) APIで認証中...")
+try:
+    client = tweepy.Client(
+        consumer_key=os.getenv('TWITTER_API_KEY'),
+        consumer_secret=os.getenv('TWITTER_API_SECRET'),
+        access_token=os.getenv('TWITTER_ACCESS_TOKEN'),
+        access_token_secret=os.getenv('TWITTER_ACCESS_SECRET')
+    )
+    print("  ✅ X (Twitter)認証成功")
+except Exception as e:
+    print(f"  ❌ X (Twitter)認証に失敗しました: {e}")
+    exit()
+
 
 # --- 2. 補助関数 ---
 def get_prompt(app_info):
-    """Geminiに投げるプロンプトを組み立てる関数 ★★★完全版★★★"""
+    """Geminiに投げるプロンプトを組み立てる関数 ★★★文字数厳守版★★★"""
     return f"""
 # 指令書: Xアカウント「ゲームの妖精アプりん」の自律型コンテンツ生成
 
@@ -53,7 +78,9 @@ def get_prompt(app_info):
 
 #### 【出力要件】
 1.  【1通目の投稿（メイン紹介）】
-    - タスクAの調査結果から導き出した、このゲームの最も魅力的な「紹介ポイント」を3つに絞り、それを基に140字以内の紹介文を作成してください。
+    - タスクAの調査結果から導き出した、このゲームの最も魅力的な「紹介ポイント」を3つに絞り、それを基に紹介文を作成してください。
+    - ★★★【最重要制約】★★★
+    - **生成する文章（URLやハッシュタグを除く、紹介文の本体）は、必ず日本語で【120文字】以内に厳密に収めてください。これは絶対のルールです。**
     - 最後にアフィリエイトリンクとハッシュタグを付けます。ハッシュタグは「#PR」「#公式ハッシュタグ」に加え、調査で判明したゲームジャンルや特徴に基づき、あなたがインプレッションを最大化できると判断したものを3つ追加してください。
     - スレッド誘導文「このゲームの攻略ヒントはリプ欄へ！👇」も忘れずに入れてください。
 2.  【2通目の投稿（深掘り情報）】
@@ -69,9 +96,7 @@ def get_prompt(app_info):
 
 # --- 3. メイン処理 ---
 def main():
-    # (main関数の中身は、以前の最終版から変更ありません)
     print("\nSTEP 4: メイン処理を開始します...")
-    # ... (データ取得、フィルタリング、投稿処理など)
     try:
         all_apps = worksheet.get_all_records()
     except Exception as e:
@@ -79,7 +104,14 @@ def main():
         return
 
     print(f"  - 全{len(all_apps)}件のデータから投稿可能なアプリを探します...")
-    eligible_apps = [app for app in all_apps if unicodedata.normalize('NFKC', str(app.get('紹介可能FLG', ''))).strip().upper() == 'OK']
+    
+    eligible_apps = []
+    for app in all_apps:
+        flag_value = str(app.get('紹介可能FLG', '')) 
+        normalized_flag = unicodedata.normalize('NFKC', flag_value).strip().upper()
+        if normalized_flag == 'OK':
+            eligible_apps.append(app)
+            
     if not eligible_apps:
         print("  ❌ 投稿可能なアプリがありませんでした。（フィルタリング後の件数: 0）")
         return
@@ -113,7 +145,6 @@ def main():
         print("  ✅ 投稿が完了しました！")
     except Exception as e:
         print(f"  ❌ Xへの投稿に失敗しました: {e}")
-
 
 if __name__ == "__main__":
     main()

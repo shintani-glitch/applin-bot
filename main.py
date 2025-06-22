@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 import unicodedata
 
 # --- 1. 初期設定と認証 ---
-# .envファイルから環境変数を読み込む
 load_dotenv()
 
 # Google認証
@@ -19,19 +18,17 @@ try:
     print("  ✅ Google認証成功")
 except Exception as e:
     print(f"  ❌ Google認証またはスプレッドシートのオープンに失敗しました: {e}")
-    # この時点で失敗したら、以降の処理は行えないので終了
     exit()
 
 # Gemini認証
 print("STEP 2: Gemini APIで認証中...")
 try:
     genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
-    model = genai.GenerativeModel('gemini-1.5-flash') # または 'gemini-pro'
+    model = genai.GenerativeModel('gemini-1.5-flash')
     print("  ✅ Gemini認証成功")
 except Exception as e:
     print(f"  ❌ Gemini認証に失敗しました: {e}")
     exit()
-
 
 # X (Twitter)認証
 print("STEP 3: X (Twitter) APIで認証中...")
@@ -66,7 +63,18 @@ def get_prompt(app_info):
 ## 2. 実行タスク
 (省略)
 
-## 3. 出力形式 (この形式を厳守)
+## 3. 出力要件
+#### 【1通目の投稿（メイン紹介）】
+- タスクAの調査結果から導き出した、このゲームの最も魅力的な「紹介ポイント」を3つに絞り、それを基に140字以内の紹介文を作成してください。
+- ★★★【重要・今回の変更点】★★★
+- 最後にハッシュタグを付けてください。アフィリエイトリンクは絶対に含めないでください。
+- ハッシュタグは「#PR」「#公式ハッシュタグ」に加え、調査で判明したゲームジャンルや特徴に基づき、あなたがインプレッションを最大化できると判断したものを3つ追加してください。
+- スレッド誘導文「このゲームの攻略ヒントはリプ欄へ！👇」も忘れずに入れてください。
+
+#### 【2通目の投稿（深掘り情報）】
+- (変更なし)
+
+## 4. 出力形式 (この形式を厳守)
 【1通目】
 (生成された文章)
 【2通目】

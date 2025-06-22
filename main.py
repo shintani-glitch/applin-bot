@@ -1,54 +1,76 @@
+import os
+
+def check_environment_variables():
+    """Renderに設定された環境変数を一つずつチェックする関数"""
+    print("STEP 3: 環境変数のチェック開始")
+    
+    # チェックするべきキーのリスト
+    required_keys = [
+        'SPREADSHEET_NAME',
+        'GOOGLE_API_KEY',
+        'TWITTER_API_KEY',
+        'TWITTER_API_SECRET',
+        'TWITTER_ACCESS_TOKEN',
+        'TWITTER_ACCESS_SECRET'
+    ]
+    
+    all_ok = True
+    for key in required_keys:
+        value = os.getenv(key)
+        if value:
+            # 値の最初と最後の数文字だけ表示して、設定されていることを確認
+            # （完全なキーはセキュリティのため表示しない）
+            display_value = f"{value[:2]}...{value[-2:]}" if len(value) > 4 else value
+            print(f"  ✅ {key}: 設定されています (値: {display_value})")
+        else:
+            print(f"  ❌ {key}: 未設定です！これが原因の可能性があります。")
+            all_ok = False
+            
+    if all_ok:
+        print("STEP 4: 全ての環境変数が正常に読み込めています。")
+    else:
+        print("STEP 4: 環境変数に未設定の項目がありました。")
+        
+    return all_ok
+
+def check_secret_file():
+    """Renderに設定されたSecret Fileが存在するかチェックする関数"""
+    print("STEP 5: Secret Fileのチェック開始")
+    
+    secret_file_path = 'google_credentials.json'
+    
+    if os.path.exists(secret_file_path):
+        print(f"  ✅ {secret_file_path}: ファイルが見つかりました！")
+        # ファイルの中身が空でないかも念のためチェック
+        if os.path.getsize(secret_file_path) > 0:
+            print("  ✅ ファイルの中身も空ではありません。")
+            print("STEP 6: Secret Fileは正常に設定されています。")
+            return True
+        else:
+            print(f"  ❌ {secret_file_path}: ファイルは存在しますが、中身が空です！")
+            return False
+    else:
+        print(f"  ❌ {secret_file_path}: ファイルが見つかりません！これが原因です。")
+        print("STEP 6: Secret Fileの設定に問題があります。")
+        return False
+
 def main():
-    print("処理を開始します...")
-    try:
-        all_apps = worksheet.get_all_records()
-    except Exception as e:
-        print(f"スプレッドシートのデータ取得でエラーが発生しました: {e}")
-        return
+    """デバッグ用のメイン処理"""
+    print("--- デバッグモード開始 ---")
+    print("STEP 1: スクリプトが正常に開始されました。")
+    print("STEP 2: ライブラリのインポートは成功しています。")
+    
+    env_ok = check_environment_variables()
+    secret_ok = check_secret_file()
+    
+    print("--- デバッグモード終了 ---")
+    
+    if env_ok and secret_ok:
+        print("\n結論: 全ての環境設定は、プログラムから正常に認識できています。")
+        print("もしこれでも動作しない場合、他の原因（GitHub連携など）が考えられます。")
+    else:
+        print("\n結論: 上記の「❌」マークの部分が、プログラムが停止していた原因です。")
+        print("Renderのダッシュボードで、該当する設定を再度丁寧にご確認ください。")
 
-    # ★★★ デバッグコードここから ★★★
-    print(f"--- シートから全{len(all_apps)}件のデータを読み込みました ---")
-    print("--- データの先頭5件をチェックします ---")
-    for i, app in enumerate(all_apps[:5]):
-        # 紹介可能FLGのキーと値を丁寧に出力
-        flag_value = app.get('紹介可能FLG', 'キーが存在しません') # キーがない場合も考慮
-        print(f"{i+1}行目: {app.get('アプリ名', '名前なし')} -> 紹介可能FLGの値: '{flag_value}'")
-    print("------------------------------------")
-    # ★★★ デバッグコードここまで ★★★
-
-    # フィルタリング処理
-    eligible_apps = [app for app in all_apps if app.get('紹介可能FLG') == 'OK']
-
-    if not eligible_apps:
-        print("投稿可能なアプリがありませんでした。（フィルタリング後の件数: 0）")
-        return
-
-    # ランダムに1つ選ぶ
-    app_info = random.choice(eligible_apps)
-    print(f"選ばれたアプリ: {app_info['アプリ名']}")
-
-    # (以降のGeminiへの処理は変更なし)
-    prompt = get_prompt(app_info)
-    try:
-        response = model.generate_content(prompt)
-        # レスポンスから1通目と2通目のテキストを抽出
-        parts = response.text.split("【2通目】")
-        first_tweet_text = parts[0].replace("【1通目】", "").strip()
-        second_tweet_text = parts[1].strip() if len(parts) > 1 else ""
-
-        if not first_tweet_text or not second_tweet_text:
-             raise Exception("期待した形式でコンテンツが生成されませんでした。")
-
-    except Exception as e:
-        print(f"Geminiでのコンテンツ生成に失敗しました: {e}")
-        return
-
-    # Xにスレッドを投稿
-    try:
-        print("1通目を投稿中...")
-        first_tweet = client.create_tweet(text=first_tweet_text)
-        print("2通目を投稿中...")
-        client.create_tweet(text=second_tweet_text, in_reply_to_tweet_id=first_tweet.data['id'])
-        print("投稿が完了しました！")
-    except Exception as e:
-        print(f"Xへの投稿に失敗しました: {e}")
+if __name__ == "__main__":
+    main()

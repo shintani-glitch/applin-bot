@@ -1,5 +1,5 @@
 gspread
 google-auth-oauthlib
-google-generativeai
 tweepy
 python-dotenv
+requests

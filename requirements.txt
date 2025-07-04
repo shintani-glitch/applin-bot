@@ -3,3 +3,5 @@ google-auth-oauthlib
 tweepy
 python-dotenv
 requests
+google-generativeai
+pyshorteners

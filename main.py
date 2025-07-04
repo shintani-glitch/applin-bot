@@ -1,4 +1,4 @@
-# main.py
+# main.py (最終バグ修正版)
 
 import pyshorteners
 import sheets
@@ -26,13 +26,46 @@ def main():
         print("本日の処理を終了します。")
         return
 
-    # STEP 4: 最終的なツイートの組み立て
-    print("STEP 4: 最終的なツイートを組み立て中...")
-    # (以前のコードから変更なし)
-    # ...
-    
-    # STEP 5: ツイート投稿
-    twitter_api.post_tweet(client_v2, final_tweet, media_id)
+    # ★★★ STEP 4: ツイートの組み立てと投稿（処理を統合） ★★★
+    print("STEP 4: 最終的なツイートの組み立てと投稿...")
+    try:
+        # --- ツイートの組み立て ---
+        print("  - ツイートを組み立て中...")
+        s = pyshorteners.Shortener()
+        short_link = s.tinyurl.short(app_info.get('アフィリエイトリンク', ''))
+        
+        catchphrase = tweet_parts.get("catchphrase", "おすすめゲーム見つけたよ！")
+        benefits = tweet_parts.get("benefits", [])
+        generated_hashtags = tweet_parts.get("hashtags", [])
+
+        tweet_lines = []
+        if catchphrase:
+            tweet_lines.append(f"✨ {catchphrase} ✨")
+        tweet_lines.append(f"【{app_info.get('アプリ名', '')}】")
+        tweet_lines.append("")
+        for benefit in benefits:
+            tweet_lines.append(f"✅ {benefit}")
+        tweet_lines.append("")
+        tweet_lines.append("▼ダウンロードはこちらから👇")
+        tweet_lines.append(short_link)
+        tweet_lines.append("")
+
+        base_hashtags = ["#PR", app_info.get('公式ハッシュタグ', '')]
+        all_hashtags = base_hashtags + generated_hashtags
+        hashtag_string = " ".join(filter(None, all_hashtags))
+        tweet_lines.append(hashtag_string)
+
+        final_tweet = "\n".join(filter(None, tweet_lines))
+        print(f"  - 組み立て完了:\n{final_tweet}")
+        
+        # --- ツイート投稿 ---
+        print("  - Xにツイートを投稿中...")
+        twitter_api.post_tweet(client_v2, final_tweet, media_id)
+
+    except Exception as e:
+        print(f"  ❌ ツイートの組み立てまたは投稿に失敗しました: {e}")
+        return
+
     print("\n全ての処理が完了しました。")
 
 if __name__ == "__main__":

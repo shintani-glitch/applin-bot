@@ -2,8 +2,8 @@ import pyshorteners
 import sheets
 import content_generator
 import twitter_api
-from datetime import datetime # ★★★ 追加 ★★★
-import pytz                 # ★★★ 追加 ★★★
+from datetime import datetime
+import pytz
 
 def is_post_time():
     """現在が投稿すべき時間かを判定する"""
@@ -12,7 +12,6 @@ def is_post_time():
     weekday = now.weekday()  # 月曜=0, ..., 日曜=6
     hour = now.hour
 
-    # ★★★ 0時を追加した新しいスケジュール ★★★
     # 平日 (月曜〜金曜) の投稿時間
     if 0 <= weekday <= 4 and hour in [0, 7, 9, 12, 15, 18, 19, 20, 21, 22, 23]:
         return True
@@ -24,7 +23,6 @@ def is_post_time():
     return False
 
 def main():
-    # ★★★ スケジュールチェックを追加 ★★★
     if not is_post_time():
         jst = pytz.timezone('Asia/Tokyo')
         print(f"現在時刻 ({datetime.now(jst).strftime('%H:%M')}) は投稿時間外です。処理をスキップします。")
@@ -53,10 +51,10 @@ def main():
     # STEP 4: 最終的なツイートの組み立てと投稿
     print("STEP 4: 最終的なツイートの組み立てと投稿...")
     try:
-        # --- ★★★ URL短縮（失敗しても継続するように修正） ★★★ ---
+        # --- URL短縮 ---
         print("  - URLを短縮中...")
         original_link = app_info.get('アフィリエイトリンク', '')
-        short_link = original_link # デフォルトは元のリンク
+        short_link = original_link 
         if original_link:
             try:
                 s = pyshorteners.Shortener()
@@ -64,7 +62,7 @@ def main():
                 print(f"  ✅ URLを短縮しました: {short_link}")
             except Exception as e:
                 print(f"  ⚠️ URLの短縮に失敗しました: {e}。元のリンクを使用します。")
-                short_link = original_link # 失敗した場合は元のリンクに戻す
+                short_link = original_link
         
         # --- ツイートの組み立て ---
         print("  - ツイートを組み立て中...")
@@ -80,7 +78,10 @@ def main():
         for benefit in benefits:
             tweet_lines.append(f"✅ {benefit}")
         tweet_lines.append("")
-        tweet_lines.append("▼ダウンロードはこちらから👇")
+        
+        # ★★★ ここが今回の修正点です ★★★
+        tweet_lines.append("▽アプリストアでチェック👇")
+        
         tweet_lines.append(short_link)
         tweet_lines.append("")
 

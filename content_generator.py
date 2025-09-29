@@ -22,7 +22,7 @@ def generate_tweet_parts(app_info):
         
         # モデルに設定を適用
         model = genai.GenerativeModel(
-            'gemini-1.5-flash',
+            'gemini-2.5-flash',
             generation_config=generation_config
         )
         # ★★★ 新しい設定ここまで ★★★
